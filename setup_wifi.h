@@ -8,6 +8,7 @@
 
 #include "util.h"
 #include "D_config.h"
+#include "Parts.h"
 
 namespace SetupWifi {
 
@@ -15,7 +16,7 @@ namespace SetupWifi {
   String getPersistedPass();
   String getBoxIP();
 
-  bool setupWiFi(bool isReboot,void(*show_fn)(int,String,String,String,String),bool forceAP);
+  bool setupWiFi(bool forceAP);
 
 }
 

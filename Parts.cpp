@@ -230,39 +230,44 @@ bool RTCinit() {
     Serial.flush();
     return false;
   }
+  Serial.println("RTCinit:");
+  Serial.println(F(__DATE__));
+  Serial.println(F(__TIME__));
+  
   if (rtc.lostPower()) {
     Serial.println("RTC lost power, let's set the time!");
     // When time needs to be set on a new device, or after a power loss, the
     // following line sets the RTC to the date & time this sketch was compiled
-    //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     // This line sets the RTC with an explicit date & time, for example to set
     // January 21, 2014 at 3am you would call:
-    rtc.adjust(DateTime(2020, 9, 24, 12, 0, 0));
+    //rtc.adjust(DateTime(2020, 9, 24, 12, 0, 0));
   }
   
   DateTime now = rtc.now();
-
-  Serial.print(now.year(), DEC);
-  Serial.print('/');
-  Serial.print(now.month(), DEC);
-  Serial.print('/');
-  Serial.print(now.day(), DEC);
-  Serial.print(" (");
+  
   Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
-  Serial.print(") ");
-  Serial.print(now.hour(), DEC);
-  Serial.print(':');
-  Serial.print(now.minute(), DEC);
-  Serial.print(':');
-  Serial.print(now.second(), DEC);
+  Serial.println(getDateAsStr());
   Serial.println();
-
-  Serial.print(" since midnight 1/1/1970 = ");
-  Serial.print(now.unixtime());
+  Serial.printf("unix time: %d\n",now.unixtime());
   return true;
 }
 
-long currentTimeSecs() {
+void adjust(const char* date,const char* time) {
+  rtc.adjust(DateTime(F(date), F(time)));
+}
+
+DateTime now() {
+  return rtc.now();
+}
+
+String getDateAsStr() {
+  DateTime now = rtc.now();
+  String result=format("%04d-%02d-%02dT%02d:%02d:%02d",now.year(),now.month(),now.day(),now.hour(),now.minute(),now.second());
+  return result;
+}
+
+unsigned long currentTimeSecs() {
   DateTime now = rtc.now();
   return now.unixtime();
 }
@@ -332,10 +337,11 @@ long currentTimeSecs() {
     tft.fillScreen(TFT_BLACK);
   }
 
-  void displayShow(int delta,String line1,String line2,String line3,String line4) {
-    displayClear();
+
+  void displayShowNoClear(int delta,String line1,String line2,String line3,String line4) {
     tft.setTextDatum(MC_DATUM);
     tft.setTextSize(2);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
     int lineHeight=tft.height()/4;
     tft.drawString(line1,0,lineHeight*0);
     tft.drawString(line2,0,lineHeight*1);
@@ -343,6 +349,13 @@ long currentTimeSecs() {
     tft.drawString(line4,0,lineHeight*3);
     delay(delta);
   }
+
+  void displayShow(int delta,String line1,String line2,String line3,String line4) {
+    displayClear();
+    displayShowNoClear(delta, line1, line2, line3, line4);
+  }
+
+
 
   void displayPower(bool on) {
     tft.writecommand(on?TFT_DISPON:TFT_DISPOFF);

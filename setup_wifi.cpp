@@ -55,8 +55,8 @@ namespace SetupWifi {
     return readEEPROM(64,16);
   }
 
-  bool setupWiFi(bool isReboot,void(*show_fn)(int,String,String,String,String),bool forceAP) {
-    show=show_fn;
+  bool setupWiFi(bool forceAP) {
+    show=Parts::displayShow;
     Serial.println("setupWiFi... (1)");
     if (!eepromReady) EEPROM.begin(512);
     eepromReady=true;
@@ -67,7 +67,7 @@ namespace SetupWifi {
     bool ok=false;
     if (!forceAP) {
       for (int n=0; n<10; n++) {
-        if (isReboot) show(500,"WiFi","connecting to:",ssdi,format("try: %d",n+1));
+         show(500,"WiFi","connecting to:",ssdi,format("try: %d",n+1));
         Serial.printf("ssdi: %s, pass: %s, try# %d\n",ssdi.c_str(),pass.c_str(),n);
         if (WiFi.status() == WL_CONNECTED) {
           ok=true;
@@ -82,7 +82,7 @@ namespace SetupWifi {
     else {
       setupAP();
     }
-    if (isReboot) show(3000,"Connect to",format("'%s' WiFi",AP_NAME),"",format("http://%s",WiFi.softAPIP().toString().c_str()));
+    show(3000,"Connect to",format("'%s' WiFi",AP_NAME),"",format("http://%s",WiFi.softAPIP().toString().c_str()));
     while ((WiFi.status() != WL_CONNECTED)) {
       server->handleClient();
     }
@@ -164,7 +164,7 @@ namespace SetupWifi {
       content += ipStr;
       content += "<p>";
       content += html;
-      content += "</p><form method='get' action='setting'><label>SSID: </label><input name='ssid' length=32/><input name='pass' length=64/><br><label>Box ip:</label><input name='box' length=32/><input type='submit'></form>";
+      content += "</p><form method='get' action='setting'><label>SSID: </label><input name='ssid' length=32/><input name='pass' length=64/><br><label>Box ip:</label><input name='box' length=32/><br><label>Date:</label><input name='date' length=25/>><br><label>Time:</label><input name='time' length=25/><br><input type='submit'></form>";
       content += "</html>";
       server->send(200, "text/html", content);
     });
@@ -178,6 +178,9 @@ namespace SetupWifi {
     });
 
     server->on("/setting", []() {
+      String Ddate = server->arg("date");
+      String Dtime = server->arg("time");
+      Parts::adjust(Ddate.c_str(),Dtime.c_str());
       String ssid = server->arg("ssid");
       String pass = server->arg("pass");
       String boxIp = server->arg("box");

@@ -41,9 +41,15 @@ namespace Parts {
   bool takeTemp();
 
   void displayShow(int delta,String line1,String line2,String line3,String line4);
+  void displayShowNoClear(int delta,String line1,String line2,String line3,String line4);
   void displayClear();
   void displayPower(bool on);
   void displayGraph(int hour,int minute,const float* amb,const float* obj);
+
+  DateTime now();
+  String getDateAsStr();
+  unsigned long currentTimeSecs();
+  void adjust(const char* date,const char* time);
 
 
   //int getGesture();
