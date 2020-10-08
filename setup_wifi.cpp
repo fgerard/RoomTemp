@@ -179,8 +179,16 @@ namespace SetupWifi {
 
     server->on("/setting", []() {
       String Ddate = server->arg("date");
+      Ddate.trim();
       String Dtime = server->arg("time");
-      Parts::adjust(Ddate.c_str(),Dtime.c_str());
+      Dtime.trim();
+      if (Ddate.length()>0 && Dtime.length()>0) {
+        Serial.printf("Time adjusted to: %s %s\n",Ddate.c_str(),Dtime.c_str());
+        Parts::adjust(Ddate.c_str(),Dtime.c_str());
+      }
+      else {
+        Serial.println("Date or time not adjusted!!");
+      }
       String ssid = server->arg("ssid");
       String pass = server->arg("pass");
       String boxIp = server->arg("box");

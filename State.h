@@ -5,7 +5,7 @@
 #include "D_config.h"
 
 namespace State {
-  void setData(int hour,int minute,float amb,float obj);
+  void setData(int hour,int minute,float tmp,float humidity,float pressure);
   void setWakeupCause(int cause);
   int getWakeupCause();
   bool isReboot();
@@ -13,10 +13,11 @@ namespace State {
   int getLastHour();
   
   bool initState();
-  void intoWindow(float lastAmbTmp,float lastObjTmp);
 
-  const float* getAmbData();
-  const float* getObjData();
+  const float* getTempData();
+  const float* getPressureData();
+  const float* getHumidityData();
+  
 
   void setSleepingDelta(unsigned long delta);
   unsigned long getSleepingDelta();

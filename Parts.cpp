@@ -24,7 +24,8 @@ namespace Parts {
 
   SemaphoreHandle_t i2c_sem = xSemaphoreCreateRecursiveMutex();
 
-  Adafruit_MLX90614* temperature=NULL;
+  //Adafruit_MLX90614* temperature=NULL;
+  BlueDot_BME280 bme = BlueDot_BME280();
 
   char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
@@ -60,37 +61,55 @@ namespace Parts {
 
 ////////////////////////////////////// Temperature ////////////////////////////////////
 
-  float lastAmbTmp;
-  float lastObjTmp;
+  float lastTemp;
+  float lastHumidity;
+  float lastPressure;
 
-  float getLastAmbTmp() {
-    return lastAmbTmp;
+
+  float getLastTemp() {
+    return lastTemp;
   }
   
-  float getLastObjTmp() {
-    return lastObjTmp;
+  float getLastPressure() {
+    return lastPressure;
+  }
+
+  float getLastHumidity() {
+    return lastHumidity;
   }
 
   bool takeTemp() {
-    lastObjTmp=temperature->readObjectTempC();
-    lastAmbTmp=temperature->readAmbientTempC();
+    delay(250);
+    lastTemp=bme.readTempC();
+    lastHumidity=bme.readHumidity();
+    lastPressure=bme.readPressure();
+    Serial.printf("\ntakeTemp(1): %.1f   %.1f   %.1f\n",lastTemp,lastHumidity,lastPressure);
+    delay(250);
+    lastTemp=bme.readTempC();
+    lastHumidity=bme.readHumidity();
+    lastPressure=bme.readPressure();
+    Serial.printf("takeTemp(2....): %.1f   %.1f   %.1f\n",lastTemp,lastHumidity,lastPressure);
     return true;
   }
 
   bool setupTemperature() {
     xSemaphoreTakeRecursive(i2c_sem, portMAX_DELAY);
-    temperature=new Adafruit_MLX90614();
-    //temperature->begin(); // NO SE DA BEGIN PORQUE SOLO HACE Wire.begin y ya está hecho!!!
-    
-    Serial.println("Testing temperature");
-    delay(500);
-    float objT=temperature->readObjectTempC();
-    float ambT=temperature->readAmbientTempC();
-  
-    Serial.println(format("Ambiente: %.1f, Object: %.1f",ambT,objT));
-    //show(2000,"Temperature C",format("Ambient %.1f",ambT),format("Object %.1f",objT),"Rekonos...");
+    bme.parameter.communication = 0;
+    bme.parameter.I2CAddress = 0x76;
+    bme.parameter.sensorMode = 0b11;
+    bme.parameter.IIRfilter = 0b100;
+    bme.parameter.humidOversampling = 0b101; 
+    bme.parameter.tempOversampling = 0b101;
+    bme.parameter.pressOversampling = 0b101;
+    bme.parameter.pressureSeaLevel = 1013.25; 
+    bme.parameter.tempOutsideCelsius = 22; 
+    int result=bme.init();
+    Serial.printf("Result: %d\n",result);
+    if (result != 0x58) {
+      Serial.println("Problems initializing bme280...");
+    }
     xSemaphoreGiveRecursive( i2c_sem);
-    return true;
+    return result==96; //0x58;
   }
   
 ////////////////////////////////////// Gestures ////////////////////////////////////
@@ -363,23 +382,27 @@ unsigned long currentTimeSecs() {
     delay(200);
   }
 
-  void displayGraph(int hour,int minute,const float* amb,const float* obj) {
+  void displayGraph(DateTime current,const float* temp,const float* humidity,const float* pressure) {
+    int hour=current.hour();
+    int minute=current.minute();
     int data_index=hour*4 + int(minute/15);
     displayClear();
     tft.setTextDatum(TL_DATUM);
     tft.setTextSize(2);
-    tft.drawString(format("%02d:%02d Tmp: %.1f-%.1f",hour,minute,amb[data_index],obj[data_index]),0,0);
+    String zDate=format("%04d-%02d-%02dT%02d:%02d:%02d",current.year(),current.month(),current.day(),current.hour(),current.minute(),current.second());
+    tft.drawString(zDate.c_str(),0,0);
+    tft.drawString(format("%.1fC %.1f%% %.1fhpa",temp[data_index],humidity[data_index],pressure[data_index]),0,20);
     tft.setTextSize(1);
     uint16_t v = analogRead(ADC_PIN);
     float battery_voltage = ((float)v / 4095.0) * 2.0 * 3.3 * (vref / 1000.0);
-    //tft.drawString(format("Batery: %.2fV",battery_voltage),0,20);
+    //tft.drawString(format("Batery: %.2fV",battery_voltage),0,20);p
 
     float minT,maxT,rangeT;
-    minT = amb[data_index];
-    maxT = amb[data_index];
+    minT = temp[data_index];
+    maxT = temp[data_index];
     for (int n=0; n<24*4; n++) {
-      if (amb[n]>0 && amb[n]<minT) minT=amb[n];
-      if (amb[n]>maxT) maxT=amb[n];
+      if (temp[n]>0 && temp[n]<minT) minT=temp[n];
+      if (temp[n]>maxT) maxT=temp[n];
       //if (obj[n]>0 && obj[n]<minT) minT=obj[n];
       //if (obj[n]>maxT) maxT=obj[n];
     }
@@ -387,17 +410,36 @@ unsigned long currentTimeSecs() {
     rangeT=maxT-minT;
     if (rangeT<1) rangeT=1;
     Serial.printf("min: %.1f, max: %.1f   range: %.1f\n",minT,maxT,rangeT);
-    tft.drawString(format("Batery: %.2fV  min:%.1fC max:%.1fC",battery_voltage,minT,maxT,rangeT),0,20);
+    tft.drawString(format("Batery: %.2fV  min:%.1fC max:%.1fC",battery_voltage,minT,maxT,rangeT),0,40);
 
     int xOff=0;
     for (int n=0; n<24*4; n++) {
       xOff=int(n/4);
-      int h=int(((amb[n]-minT)/rangeT)*60)+2;
-      tft.drawFastVLine(n*2+xOff,tft.height()-h,h,obj[n]>amb[n]?TFT_BLUE:TFT_RED);
-      tft.drawFastVLine(n*2+1+xOff,tft.height()-h,h,obj[n]>amb[n]?TFT_BLUE:TFT_RED);
+      int h=int(((temp[n]-minT)/rangeT)*60)+2;
+      tft.drawFastVLine(n*2+xOff,tft.height()-h,h,TFT_RED);
+      tft.drawFastVLine(n*2+1+xOff,tft.height()-h,h,TFT_RED);
       //h=int(((obj[n]-minT)/rangeT)*50)+2;
       //tft.drawFastVLine(n*2+1+xOff,tft.height()-h,h,obj[n]>amb[n]?TFT_RED:TFT_GREEN);
     }
+  }
+
+  void displayData(DateTime current,const float* temp,const float* humidity,const float* pressure) {
+    int hour=current.hour();
+    int minute=current.minute();
+    int data_index=hour*4 + int(minute/15);
+    uint16_t v = analogRead(ADC_PIN);
+    float battery_voltage = ((float)v / 4095.0) * 2.0 * 3.3 * (vref / 1000.0);
+    float minT,maxT,rangeT;
+    minT = temp[data_index];
+    maxT = temp[data_index];
+    for (int n=0; n<24*4; n++) {
+      if (temp[n]>0 && temp[n]<minT) minT=temp[n];
+      if (temp[n]>maxT) maxT=temp[n];
+      //if (obj[n]>0 && obj[n]<minT) minT=obj[n];
+      //if (obj[n]>maxT) maxT=obj[n];
+    }
+    //displayShowNoClear(100,Parts::getDateAsStr().c_str(),format("Batery: %.2fV  min:%.1fC max:%.1fC",battery_voltage,minT,maxT,rangeT),"Temp:",format("%.1f   %.1f",Parts::getLastAmbTmp(),Parts::getLastObjTmp()));
+    displayShowNoClear(100,Parts::getDateAsStr().c_str(),format("Bat: %.2fV",battery_voltage),format("min:%.1fC max:%.1fC",minT,maxT),format("%.1f %.1f %.1f",getLastTemp(),getLastHumidity(),getLastPressure()));
   }
 
 
@@ -420,9 +462,9 @@ unsigned long currentTimeSecs() {
         //tft.drawString(format("width: %d",tft.width()),5,35);
         tft.setTextSize(2);
         tft.setTextColor(TFT_YELLOW,TFT_BLACK);
-        tft.drawString(format("Amb: %.1f%",Parts::getLastAmbTmp()),0,140);
-        tft.setTextColor(Parts::getLastAmbTmp()>Parts::getLastObjTmp()?TFT_GREEN:TFT_RED,TFT_BLACK);
-        tft.drawString(format("Obj: %.1f%",Parts::getLastObjTmp()),0,165);
+        tft.drawString(format("Temp: %.1f%",getLastTemp()),0,140);
+        tft.setTextColor(TFT_RED,TFT_BLACK);
+        tft.drawString(format("Pres: %.1f%",getLastPressure()),0,165);
       }
     }
   }

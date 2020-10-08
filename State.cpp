@@ -15,8 +15,9 @@ namespace State {
   
   
   RTC_DATA_ATTR int wake_cause=ESP_SLEEP_WAKEUP_EXT0; // true es que despertó por boton, false que fue el timer
-  RTC_DATA_ATTR float amb_temp_window[24*4]={0};
-  RTC_DATA_ATTR float obj_temp_window[24*4]={0};
+  RTC_DATA_ATTR float temp_window[24*4]={0};
+  RTC_DATA_ATTR float humidity_window[24*4]={0};
+  RTC_DATA_ATTR float pressure_window[24*4]={0};
 
   void setWakeupCause(int cause) {
     wake_cause=cause;
@@ -38,48 +39,46 @@ namespace State {
     return last_known_hour;
   }
   
-  void setData(int hour,int minute,float amb,float obj) {
+  void setData(int hour,int minute,float temp,float humidity,float pressure) {
+    Serial.printf("setData: %.1f %.1f %.1f\n",temp,humidity,pressure);
     last_known_hour=hour;
     last_known_minute=minute;
     data_index=hour*4 + int(minute/15);
-    amb_temp_window[data_index]=amb;
-    obj_temp_window[data_index]=obj;
+    temp_window[data_index]=temp;
+    humidity_window[data_index]=humidity;
+    pressure_window[data_index]=pressure;
     for (int j=int(minute/15)+1; j<4; j++) {
-      amb_temp_window[data_index+j]=0;
-      obj_temp_window[data_index+j]=0;
+      temp_window[data_index+j]=0;
+      humidity_window[data_index+j]=0;
+      pressure_window[data_index+j]=0;
     }
     Serial.printf("now: %02d:%02d  idx:%d\n",hour,minute,data_index);
     for (int i=0; i<24*4; i++) {
-      Serial.printf("%5.2f   %5.2f\n",amb_temp_window[i],obj_temp_window[i]);
+      Serial.printf("%5.2f   %5.2f  %5.2f\n",temp_window[i],humidity_window[i],pressure_window[i]);
     }
   }
 
   bool initState() {
     // true setup for the first time
     Serial.println("This is a boot!!");
-    Serial.printf("temp_window_size: %d\n",sizeof(amb_temp_window));
-    memset(amb_temp_window,0,sizeof(amb_temp_window));
-    memset(obj_temp_window,0,sizeof(obj_temp_window));
+    Serial.printf("temp_window_size: %d\n",sizeof(temp_window));
+    memset(temp_window,0,sizeof(temp_window));
+    memset(humidity_window,0,sizeof(humidity_window));
+    memset(pressure_window,0,sizeof(pressure_window));
     return true;
   }
   
-  
-  void intoWindow(float lastAmbTmp,float lastObjTmp) {
-    memcpy(amb_temp_window,amb_temp_window+1,sizeof(amb_temp_window)-sizeof(float));
-    memcpy(obj_temp_window,obj_temp_window+1,sizeof(obj_temp_window)-sizeof(float));
-    amb_temp_window[24*4-1]=lastAmbTmp;
-    obj_temp_window[24*4-1]=lastObjTmp;
-    for (int i=0; i<24*4; i++) {
-      Serial.printf("%5.2f   %5.2f\n",amb_temp_window[i],obj_temp_window[i]);
-    }
+    
+  const float* getTempData() {
+    return temp_window;
   }
   
-  const float* getAmbData() {
-    return amb_temp_window;
+  const float* getHumidityData() {
+    return humidity_window;
   }
-  
-  const float* getObjData() {
-    return obj_temp_window;
+
+  const float* getPressureData() {
+    return pressure_window;
   }
 
   void setSleepingDelta(unsigned long delta) {
