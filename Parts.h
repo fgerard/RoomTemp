@@ -20,6 +20,8 @@
 
 #include "D_config.h"
 
+#include "State.h"
+
 namespace Parts {
 
   bool RTCinit();
@@ -46,7 +48,7 @@ namespace Parts {
   void displayShowNoClear(int delta,String line1,String line2,String line3,String line4);
   void displayClear();
   void displayPower(bool on);
-  void displayGraph(DateTime current,const float* temp,const float* humidity,const float* pressure);
+  void displayGraph(bool withDelay,DateTime current,const char* title,const char* fmat,const float* data);
   void displayData(DateTime current,const float* temp,const float* humidity,const float* pressure);
 
   DateTime now();

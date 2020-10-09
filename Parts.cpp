@@ -109,7 +109,7 @@ namespace Parts {
       Serial.println("Problems initializing bme280...");
     }
     xSemaphoreGiveRecursive( i2c_sem);
-    return result==96; //0x58;
+    return result==0x60 || result==0x58;
   }
   
 ////////////////////////////////////// Gestures ////////////////////////////////////
@@ -224,13 +224,20 @@ void resetButtonRight() {
 
 void buttonInit() {
   btn_right.setLongClickHandler([](Button2 & b) {
+    Serial.println("btn_right setLongClickHandler");
+    delay(3000);
   });
   
   btn_right.setPressedHandler([](Button2 & b) {
+    Serial.println("btn_right setPressedHandler");
+    delay(3000);
     btnRight++;
   });
 
   btn_left.setPressedHandler([](Button2 & b) {
+    State::changeSelectedGraph();
+    State::setTimeMark();
+    State::setWithDelay(true);
     btnLeft++;
   });
 }
@@ -382,42 +389,64 @@ unsigned long currentTimeSecs() {
     delay(200);
   }
 
-  void displayGraph(DateTime current,const float* temp,const float* humidity,const float* pressure) {
+  void displayGraph(bool withDelay,DateTime current,const char* title,const char* fmat,const float* data) {
     int hour=current.hour();
     int minute=current.minute();
     int data_index=hour*4 + int(minute/15);
-    displayClear();
+    //displayClear();
     tft.setTextDatum(TL_DATUM);
     tft.setTextSize(2);
-    String zDate=format("%04d-%02d-%02dT%02d:%02d:%02d",current.year(),current.month(),current.day(),current.hour(),current.minute(),current.second());
-    tft.drawString(zDate.c_str(),0,0);
-    tft.drawString(format("%.1fC %.1f%% %.1fhpa",temp[data_index],humidity[data_index],pressure[data_index]),0,20);
-    tft.setTextSize(1);
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.drawString(title,0,0);    
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    
     uint16_t v = analogRead(ADC_PIN);
     float battery_voltage = ((float)v / 4095.0) * 2.0 * 3.3 * (vref / 1000.0);
-    //tft.drawString(format("Batery: %.2fV",battery_voltage),0,20);p
-
+    
     float minT,maxT,rangeT;
-    minT = temp[data_index];
-    maxT = temp[data_index];
+    minT = data[data_index];
+    maxT = data[data_index];
     for (int n=0; n<24*4; n++) {
-      if (temp[n]>0 && temp[n]<minT) minT=temp[n];
-      if (temp[n]>maxT) maxT=temp[n];
-      //if (obj[n]>0 && obj[n]<minT) minT=obj[n];
-      //if (obj[n]>maxT) maxT=obj[n];
+      if (data[n]>0 && data[n]<minT) minT=data[n];
+      if (data[n]>maxT) maxT=data[n];
     }
     //minT -= 2;
     rangeT=maxT-minT;
-    if (rangeT<1) rangeT=1;
     Serial.printf("min: %.1f, max: %.1f   range: %.1f\n",minT,maxT,rangeT);
-    tft.drawString(format("Batery: %.2fV  min:%.1fC max:%.1fC",battery_voltage,minT,maxT,rangeT),0,40);
-
+    if (rangeT<1) rangeT=1;
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.drawString(format(fmat,data[data_index],minT,maxT),0,20);
+    tft.setTextSize(1);
+    tft.drawString(format("Batery: %.2fV",battery_voltage),0,40);
+    //tft.setTextSize(2);
     int xOff=0;
-    for (int n=0; n<24*4; n++) {
+    int n=data_index+1 % (24*4);
+    for (int j=0; j<24*4; j++) {
+      current=now();
+      String zDate=format("%02d:%02d:%02d",current.hour(),current.minute(),current.second());
+      tft.setTextSize(2);
+      tft.setTextColor(TFT_GREEN, TFT_BLACK);
+      tft.drawString(zDate.c_str(),145,0);
+      tft.setTextSize(1);
       xOff=int(n/4);
-      int h=int(((temp[n]-minT)/rangeT)*60)+2;
+      int h=int(((data[n]-minT)/rangeT)*60)+2;
+      tft.drawFastVLine(n*2+xOff,tft.height()-62,62,TFT_BLUE);
+      tft.drawFastVLine(n*2+1+xOff,tft.height()-62,62,TFT_BLUE);
+      if (withDelay) {
+        delay(25);
+      }
+      if (n != data_index) {
+        tft.drawFastVLine(n*2+xOff,tft.height()-62,62,TFT_BLACK);
+        tft.drawFastVLine(n*2+1+xOff,tft.height()-62,62,TFT_BLACK);
+      }
       tft.drawFastVLine(n*2+xOff,tft.height()-h,h,TFT_RED);
       tft.drawFastVLine(n*2+1+xOff,tft.height()-h,h,TFT_RED);
+      tft.setTextColor(n==data_index?TFT_GREEN:TFT_RED, TFT_BLACK);
+      tft.drawString(format("%3.1f",data[n]),150,40);
+      if (withDelay) {
+        delay(10);
+      }
+      n=++n % (24*4);
       //h=int(((obj[n]-minT)/rangeT)*50)+2;
       //tft.drawFastVLine(n*2+1+xOff,tft.height()-h,h,obj[n]>amb[n]?TFT_RED:TFT_GREEN);
     }

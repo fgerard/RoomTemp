@@ -10,8 +10,10 @@ NTPClient ntpClient(ntpUDP,"pool.ntp.org",-5*3600,15000);
 
 esp_sleep_wakeup_cause_t cause;
 DateTime current;
-unsigned long lastMillis;
 int n;
+                                              
+char* title[]={"Temperature","Humidity    ","Pressure    "};
+char* fmat[]={"%.1fC [%.1f,%.1f]","%.1f%% [%.1f,%.1f]","%.1fhpa [%.f,%.f]"};
 
 void go2sleep() {
   current = Parts::now();
@@ -35,7 +37,7 @@ void setup() {
   bool isReboot=State::isReboot();
   State::setWakeupCause(cause);
   Serial.printf("wakeup cause: %d    %d, %d, %d, %d\n",cause,ESP_SLEEP_WAKEUP_UNDEFINED,ESP_SLEEP_WAKEUP_EXT0, ESP_SLEEP_WAKEUP_EXT1,ESP_SLEEP_WAKEUP_TIMER );
-
+  State::loadInitial();
   if (!Parts::initParts()) {
     Serial.println("halting!");
     for(;;);
@@ -67,7 +69,7 @@ void setup() {
   Serial.printf("Desperto, tomando datos: %sn",Parts::getDateAsStr().c_str());
   if (Parts::takeTemp()) {
     State::setData(current.hour(),current.minute(),Parts::getLastTemp(),Parts::getLastHumidity(),Parts::getLastPressure());
-    lastMillis=millis(); 
+    State::setTimeMark();
     n=0;
   }
   else {
@@ -76,10 +78,16 @@ void setup() {
   }
 }
 
+int lastSeconds=-1;
+
 void loop() {
   current = Parts::now();
+  while (lastSeconds == current.second()) {
+    current = Parts::now();
+  }
+  lastSeconds=current.second();
   if (cause==ESP_SLEEP_WAKEUP_EXT1) {
-    if ((millis()-lastMillis)>10000) {
+    if ((millis()-State::getTimeMark())>10000) {
       go2sleep();
     }
     if (Parts::takeTemp()) {
@@ -95,15 +103,18 @@ void loop() {
     if (cause==ESP_SLEEP_WAKEUP_EXT0) {
       if (Parts::takeTemp()) {
         State::setData(current.hour(),current.minute(),Parts::getLastTemp(),Parts::getLastHumidity(),Parts::getLastPressure());
-        Parts::displayGraph(current,State::getTempData(),State::getHumidityData(),State::getPressureData());
-        delay(1000);
+        Parts::displayGraph(State::getWithDelay(),current,title[State::getSelectedGraph()],fmat[State::getSelectedGraph()],State::getSelectedData());
+        if (State::getWithDelay()) {
+          State::setTimeMark();
+        }
+        State::setWithDelay(false);
       }
       else {
         Parts::displayShow(3000,"Problems with","temp sensor","","");
         go2sleep();    
       }
     }
-    if ((millis()-lastMillis)>10000 || cause==ESP_SLEEP_WAKEUP_TIMER) {
+    if ((millis()-State::getTimeMark())>10000 || cause==ESP_SLEEP_WAKEUP_TIMER) {
       go2sleep();
     }
   }

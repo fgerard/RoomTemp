@@ -19,6 +19,54 @@ namespace State {
   RTC_DATA_ATTR float humidity_window[24*4]={0};
   RTC_DATA_ATTR float pressure_window[24*4]={0};
 
+  RTC_DATA_ATTR int selectedGraph=0;
+
+  RTC_DATA_ATTR bool load_initial_flg=true;
+
+  float initial_data_tmp[24*4] = {
+    INIT_DATA_TMP
+  };
+
+  float initial_data_hummidity[24*4] = {
+    INIT_DATA_HUMIDITY
+  };
+
+  float initial_data_pressure[24*4] = {
+    INIT_DATA_PRESSURE
+  };
+
+
+  void loadInitial() {
+    if (load_initial_flg) {
+      for (int i=0; i<24*4; i++) {
+        temp_window[i]=initial_data_tmp[i];
+        humidity_window[i]=initial_data_hummidity[i];
+        pressure_window[i]=initial_data_pressure[i];
+      }
+    }
+    load_initial_flg=false;
+  }
+
+  unsigned long timeMark=0;
+  bool withDelay=false;
+
+  unsigned long setTimeMark() {
+    timeMark=millis();
+    return timeMark;
+  }
+  
+  unsigned long getTimeMark() {
+    return timeMark;
+  }
+
+  void setWithDelay(bool newVal) {
+    withDelay=newVal;
+  }
+  
+  bool getWithDelay() {
+    return withDelay;
+  }
+
   void setWakeupCause(int cause) {
     wake_cause=cause;
   }
@@ -87,6 +135,18 @@ namespace State {
 
   unsigned long getSleepingDelta() {
     return sleeping_delta;
+  }
+
+  int getSelectedGraph() {
+    return selectedGraph;
+  }
+  
+  void changeSelectedGraph() {
+    selectedGraph=++selectedGraph % 3;
+  }
+
+  const float* getSelectedData() {
+    return selectedGraph==0?temp_window:selectedGraph==1?humidity_window:pressure_window;
   }
     
 }

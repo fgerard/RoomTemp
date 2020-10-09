@@ -67,13 +67,13 @@ namespace SetupWifi {
     bool ok=false;
     if (!forceAP) {
       for (int n=0; n<10; n++) {
-         show(500,"WiFi","connecting to:",ssdi,format("try: %d",n+1));
+        show(500,"WiFi","connecting to:",ssdi,format("try: %d",n+1));
         Serial.printf("ssdi: %s, pass: %s, try# %d\n",ssdi.c_str(),pass.c_str(),n);
         if (WiFi.status() == WL_CONNECTED) {
           ok=true;
           break;
         }
-        delay(500);
+        //delay(500);
       }
     }
     if (ok) {
@@ -82,7 +82,7 @@ namespace SetupWifi {
     else {
       setupAP();
     }
-    show(3000,"Connect to",format("'%s' WiFi",AP_NAME),"",format("http://%s",WiFi.softAPIP().toString().c_str()));
+    show(500,"Connect to",format("'%s' WiFi",AP_NAME),"",format("http://%s",WiFi.softAPIP().toString().c_str()));
     while ((WiFi.status() != WL_CONNECTED)) {
       server->handleClient();
     }
